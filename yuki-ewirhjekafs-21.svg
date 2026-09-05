@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xhtml="http://www.w3.org/1999/xhtml"
+     width="100%" height="100%" viewBox="0 0 1920 1080"
+     role="img" aria-labelledby="title desc">
+  <title id="title">UBZone — CDN launcher</title>
+  <desc id="desc">Select a CDN mirror and open a predefined asset in a new tab or copy the URL to the clipboard.</desc>
+
+  <!-- Background (keeps full-bleed black like original) -->
+  <rect width="100%" height="100%" fill="#000" />
+
+  <!-- Centered instruction text (pure SVG fallback for non-HTML viewers) -->
+  <g id="center-text" transform="translate(960,540)">
+    <text text-anchor="middle" fill="#888" font-family="sans-serif" font-size="20">
+      Select a CDN mirror from the top-right to launch the resource in a new tab.
+    </text>
+  </g>
+
+  <!-- UI embedded via foreignObject for modern interactive behavior.
+       This keeps markup readable and accessible while staying inside an SVG. -->
+  <foreignObject x="0" y="0" width="100%" height="100%" id="ui-fo">
+    <xhtml:div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;font-family:system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,sans-serif;">
+      <style>
+        /* Scoped styles for the foreignObject content */
+        .panel {
+          position: absolute;
+          top: 18px;
+          right: 18px;
+          background: rgba(12,12,12,0.78);
+          color: #fff;
+          padding: 10px 12px;
+          border-radius: 8px;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+          min-width: 280px;
+          max-width: calc(100% - 36px);
+          font-size: 14px;
+          line-height: 1.25;
+        }
+        .row { display:flex; gap:8px; align-items:center; }
+        label { font-weight:600; margin-right:6px; }
+        select {
+          flex:1;
+          background:#202020;
+          color:#fff;
+          border:1px solid #333;
+          padding:6px 8px;
+          border-radius:6px;
+          font-size:14px;
+        }
+        button {
+          background: linear-gradient(180deg,#2563eb,#1e40af);
+          color:#fff;
+          border: none;
+          padding:6px 10px;
+          border-radius:6px;
+          cursor:pointer;
+          font-weight:600;
+        }
+        button.secondary {
+          background: #2a2a2a;
+          border: 1px solid #3a3a3a;
+        }
+        .status {
+          margin-top:8px;
+          font-size:13px;
+          color:#ddd;
+          min-height:18px;
+        }
+        a.link {
+          color:#9dd3ff;
+          text-decoration: none;
+        }
+        @media (max-width:420px) {
+          .panel { left:12px; right:12px; min-width:auto; top:12px; }
+          .row { flex-direction:column; align-items:stretch; }
+          button { width:100%; }
+        }
+      </style>
+
+      <div class="panel" role="form" aria-labelledby="panel-heading">
+        <div id="panel-heading" style="display:flex;align-items:center;gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="#9dd3ff" d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2zm1 14h-2v-4H9l3-8v6h1z"/>
+          </svg>
+          <div style="font-weight:700;">Mirror</div>
+        </div>
+
+        <div style="margin-top:8px;" class="row">
+          <label for="mirrorSelect" style="margin:0 4px 0 0;">Choose:</label>
+          <select id="mirrorSelect" aria-label="Choose CDN mirror">
+            <option value="" disabled selected>Select a mirror…</option>
+            <option value="https://quantil.jsdelivr.net">quantil.jsdelivr.net (Main)</option>
+            <option value="https://cdn.jsdelivr.net">cdn.jsdelivr.net</option>
+            <option value="https://fastly.jsdelivr.net">fastly.jsdelivr.net</option>
+            <option value="https://testingcf.jsdelivr.net">testingcf.jsdelivr.net</option>
+            <option value="https://gcore.jsdelivr.net">gcore.jsdelivr.net</option>
+            <option value="https://originfastly.jsdelivr.net">originfastly.jsdelivr.net</option>
+            <option value="https://jsd.onmicrosoft.cn">jsd.onmicrosoft.cn</option>
+            <option value="https://cdn.staticdelivr.com">cdn.staticdelivr.com</option>
+          </select>
+        </div>
+
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button id="openBtn" aria-label="Open selected mirror in new tab">Open</button>
+          <button id="copyBtn" class="secondary" aria-label="Copy URL to clipboard">Copy URL</button>
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+      </div>
+
+      <script type="application/javascript">
+        (function() {
+          // Path of the asset relative to the mirror (preserves original asset path)
+          const ASSET_PATH = '/gh/s0n-1m-cr1n3/sc13nc3/assets/index.html';
+
+          const select = document.getElementById('mirrorSelect');
+          const openBtn = document.getElementById('openBtn');
+          const copyBtn = document.getElementById('copyBtn');
+          const status = document.getElementById('status');
+
+          function buildUrl(mirror) {
+            // Add cache-busting query to reduce accidental caching when user tests mirrors
+            const t = Date.now();
+            // Ensure trailing slash handling: mirror may or may not include a trailing slash
+            const base = mirror.endsWith('/') ? mirror.slice(0, -1) : mirror;
+            return base + ASSET_PATH + '?t=' + encodeURIComponent(t);
+          }
+
+          function setStatus(msg, timeoutMs) {
+            status.textContent = msg;
+            if (timeoutMs) {
+              setTimeout(() => {
+                // Only clear if the same message is still visible
+                if (status.textContent === msg) status.textContent = '';
+              }, timeoutMs);
+            }
+          }
+
+          openBtn.addEventListener('click', function() {
+            const val = select.value;
+            if (!val) {
+              setStatus('Please select a mirror first.', 3000);
+              return;
+            }
+            const url = buildUrl(val);
+            // Open in a new tab safely
+            try {
+              window.open(url, '_blank', 'noopener,noreferrer');
+              setStatus('Opened: ' + url, 4500);
+            } catch (err) {
+              // Fallback: set location if popup blocked
+              setStatus('Popup blocked. Copy the URL or try again.', 5000);
+              console.error(err);
+            }
+          });
+
+          copyBtn.addEventListener('click', async function() {
+            const val = select.value;
+            if (!val) {
+              setStatus('Please select a mirror to copy its URL.', 3000);
+              return;
+            }
+            const url = buildUrl(val);
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(url);
+                setStatus('URL copied to clipboard.', 3000);
+              } else {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                setStatus('URL copied to clipboard (fallback).', 3000);
+              }
+            } catch (err) {
+              setStatus('Failed to copy URL. You can manually copy: ' + url, 6000);
+              console.error(err);
+            }
+          });
+
+          // Improve keyboard usability: Enter opens, Ctrl/Cmd+Enter opens in new tab
+          select.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') {
+              ev.preventDefault();
+              openBtn.click();
+            }
+          });
+
+          // Small friendly hint on initialization
+          setStatus('Select a mirror and click Open or Copy URL.', 4000);
+        })();
+      </script>
+    </xhtml:div>
+  </foreignObject>
+</svg>
